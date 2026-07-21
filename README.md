@@ -32,6 +32,7 @@ Before running a live login, configure these values in `.env`:
 AZURE_TENANT_ID=<tenant-guid>
 ENTRA_CLI_CLIENT_ID=<public-client-app-guid>
 ENTRA_AGENT_IDENTITY_CLIENT_ID=<agent-identity-client-guid>
+ENTRA_USER_SCOPE=api://<blueprint-app-guid>/access_as_user
 ENTRA_MCP_SCOPE=api://<mcp-resource-app-guid>/Mcp.Access
 HUNTER_DEFENDER_MCP_URL=http://127.0.0.1:8000/mcp
 ENTRA_SIDECAR_URL=http://127.0.0.1:5000
