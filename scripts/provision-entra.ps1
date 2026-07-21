@@ -314,6 +314,30 @@ if ($agentMatches.Count -eq 0) {
     Write-Host "Reused Agent Identity: $($agentIdentity.appId)"
 }
 
+# The delegated agent OBO flow acquires the MCP token as the Agent Identity on behalf of the
+# user, so the Agent Identity itself must have delegated consent to the MCP scope.
+$agentMcpGrantUri = "$GraphBeta/oauth2PermissionGrants?`$filter=clientId eq '$($agentIdentity.id)' and resourceId eq '$($mcpPrincipal.id)' and consentType eq 'AllPrincipals'"
+$agentMcpGrants = @(Get-GraphCollection -Uri $agentMcpGrantUri)
+if ($agentMcpGrants.Count -eq 0) {
+    Invoke-GraphJson -Method POST -Uri "$GraphBeta/oauth2PermissionGrants" -Body @{
+        clientId = $agentIdentity.id
+        consentType = "AllPrincipals"
+        resourceId = $mcpPrincipal.id
+        scope = $McpScope
+        startTime = [DateTimeOffset]::UtcNow.ToString("o")
+        expiryTime = [DateTimeOffset]::UtcNow.AddYears(1).ToString("o")
+    } | Out-Null
+    Write-Host "Granted Agent Identity delegated consent for $McpScope on the MCP API."
+} else {
+    $agentMcpGrant = $agentMcpGrants[0]
+    if ([string]$agentMcpGrant.scope -ne $McpScope) {
+        Invoke-GraphJson -Method PATCH -Uri "$GraphBeta/oauth2PermissionGrants/$($agentMcpGrant.id)" -Body @{
+            scope = $McpScope
+        } | Out-Null
+    }
+    Write-Host "Agent Identity delegated consent already exists."
+}
+
 $envExists = Test-Path $EnvPath
 $existingSecret = if ($envExists) {
     $secretLine = Get-Content $EnvPath | Where-Object { $_.StartsWith("ENTRA_AGENT_BLUEPRINT_CLIENT_SECRET=", [StringComparison]::Ordinal) } | Select-Object -First 1

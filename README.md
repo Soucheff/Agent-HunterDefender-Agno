@@ -53,10 +53,18 @@ its token acquisition API through an ingress or load balancer.
 On macOS, the client connects to `127.0.0.1` and sends `Host: localhost`. This avoids the native
 AirTunes service that can own IPv6 `localhost:5000` while satisfying the sidecar host filter.
 
-The current `1.1.1-azurelinux3.0-distroless` image was observed returning HTTP 403 from
-`/Validate` for a valid, consented v2 `access_as_user` token. Provisioning and health checks pass,
-but delegated token exchange remains blocked pending resolution of the sidecar authorization
-policy or an upstream fix. Do not disable MCP scope validation as a workaround.
+The compose file runs the sidecar with `ASPNETCORE_ENVIRONMENT=Development` on purpose. Outside
+Development the sidecar enables `UseLocalCallerRestriction`, which only accepts loopback source
+IPs and returns HTTP 403 for every non-health endpoint. With the agent on the host and the sidecar
+in Docker, NAT rewrites the source IP to the bridge gateway, so that check rejects valid requests.
+The Docker port binding already restricts access to `127.0.0.1`, so loopback-only access is still
+enforced. In a production pod, run the agent and sidecar in the same pod over localhost and use
+`ASPNETCORE_ENVIRONMENT=Production` so the restriction applies correctly.
+
+The delegated agent On-Behalf-Of flow acquires the MCP token as the Agent Identity on behalf of
+the user, so the Agent Identity itself must hold delegated consent to the MCP `Mcp.Access` scope.
+`scripts/provision-entra.ps1` grants this automatically. The resulting downstream token has
+`aud=<mcp>`, `scp=Mcp.Access`, `azp=<agent-identity>`, and `oid=<user>`.
 
 Provision or reconcile all required Entra resources and update `.env`:
 
