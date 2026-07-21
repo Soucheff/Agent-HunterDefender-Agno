@@ -1,0 +1,1 @@
+"""Hunter Defender MCP integration."""

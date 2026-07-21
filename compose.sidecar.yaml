@@ -1,0 +1,34 @@
+services:
+  entra-agent-id-sidecar:
+    image: mcr.microsoft.com/entra-sdk/auth-sidecar:1.1.1-azurelinux3.0-distroless
+    platform: linux/amd64
+    container_name: hunter-defender-entra-sidecar
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5000:5000"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:5000
+      AllowedHosts: localhost
+      AzureAd__Instance: https://login.microsoftonline.com/
+      AzureAd__TenantId: ${AZURE_TENANT_ID:?AZURE_TENANT_ID is required}
+      AzureAd__ClientId: ${ENTRA_AGENT_BLUEPRINT_CLIENT_ID:?ENTRA_AGENT_BLUEPRINT_CLIENT_ID is required}
+      AzureAd__Audience: ${ENTRA_AGENT_BLUEPRINT_CLIENT_ID:?ENTRA_AGENT_BLUEPRINT_CLIENT_ID is required}
+      AzureAd__Scopes: access_as_user
+      AzureAd__ClientCredentials__0__SourceType: ClientSecret
+      AzureAd__ClientCredentials__0__ClientSecret: ${ENTRA_AGENT_BLUEPRINT_CLIENT_SECRET:?ENTRA_AGENT_BLUEPRINT_CLIENT_SECRET is required}
+      DownstreamApis__HunterDefenderMcp__BaseUrl: http://host.docker.internal:8000
+      DownstreamApis__HunterDefenderMcp__Scopes: ${ENTRA_MCP_SCOPE:?ENTRA_MCP_SCOPE is required}
+      DownstreamApis__HunterDefenderMcp__RequestAppToken: "false"
+      Logging__LogLevel__Default: Information
+      Logging__LogLevel__Microsoft.Identity.Web: Information
+      Logging__LogLevel__Microsoft.AspNetCore: Warning
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
