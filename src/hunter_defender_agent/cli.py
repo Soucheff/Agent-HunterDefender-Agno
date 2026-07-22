@@ -2,6 +2,7 @@ import asyncio
 
 import typer
 from rich.console import Console
+from rich.markdown import Markdown
 from rich.table import Table
 
 from hunter_defender_agent.auth.sidecar import AgentIdentitySidecarClient, SidecarError
@@ -11,6 +12,11 @@ from hunter_defender_agent.auth.user_session import (
 )
 from hunter_defender_agent.config import EntraConfigurationError, get_settings
 from hunter_defender_agent.ollama import OllamaCheckError, OllamaHealthClient
+from hunter_defender_agent.runtime import (
+    IdentityInvestigationError,
+    IdentityInvestigationRunner,
+    InvestigationRequest,
+)
 
 app = typer.Typer(no_args_is_help=True, help="Hunter Defender identity analysis agent.")
 console = Console()
@@ -94,6 +100,68 @@ def logout() -> None:
         raise typer.Exit(code=1) from error
 
     console.print("[green]PASS[/green] Local Entra session removed")
+
+
+@app.command(name="investigate-user")
+def investigate_user(
+    user_upn: str = typer.Argument(..., help="User principal name to investigate."),
+    days_back: int = typer.Option(7, "--days-back", min=1, max=30, help="Lookback window in days."),
+) -> None:
+    """Run a one-shot read-only identity investigation for a user."""
+    settings = get_settings()
+    try:
+        runner = IdentityInvestigationRunner.from_settings(settings)
+        report = asyncio.run(
+            runner.investigate(InvestigationRequest(user_upn=user_upn, days_back=days_back))
+        )
+    except (EntraConfigurationError, IdentityInvestigationError) as error:
+        console.print(f"[bold red]FAIL[/bold red] {error}")
+        raise typer.Exit(code=1) from error
+    except (UserAuthenticationError, SidecarError) as error:
+        console.print(f"[bold red]FAIL[/bold red] Authentication: {error}")
+        raise typer.Exit(code=1) from error
+
+    console.print(Markdown(report))
+
+
+@app.command()
+def chat(
+    days_back: int = typer.Option(7, "--days-back", min=1, max=30, help="Lookback window in days."),
+) -> None:
+    """Start an interactive read-only identity analysis session."""
+    settings = get_settings()
+    try:
+        runner = IdentityInvestigationRunner.from_settings(settings)
+    except EntraConfigurationError as error:
+        console.print(f"[bold red]FAIL[/bold red] {error}")
+        raise typer.Exit(code=1) from error
+
+    try:
+        asyncio.run(_run_chat(runner, days_back))
+    except (UserAuthenticationError, SidecarError) as error:
+        console.print(f"[bold red]FAIL[/bold red] Authentication: {error}")
+        raise typer.Exit(code=1) from error
+
+
+async def _run_chat(runner: IdentityInvestigationRunner, days_back: int) -> None:
+    console.print(
+        f"Identity chat over the last {days_back} days. "
+        "Type your question, or 'exit' to quit."
+    )
+    async with runner.chat_session() as session:
+        while True:
+            try:
+                message = console.input("[bold cyan]you[/bold cyan] > ")
+            except (EOFError, KeyboardInterrupt):
+                console.print()
+                return
+            command = message.strip()
+            if command.lower() in {"exit", "quit"}:
+                return
+            if not command:
+                continue
+            reply = await session.ask(command)
+            console.print(Markdown(reply))
 
 
 if __name__ == "__main__":

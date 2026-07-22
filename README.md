@@ -14,6 +14,7 @@ Microsoft Entra Agent ID authentication.
 - Agno Streamable HTTP MCP adapter restricted to read-only identity tools
 - Deterministic, versioned identity risk scoring and report schemas
 - Bounded Agno identity specialist factory using the remote Ollama model
+- End-to-end interactive investigation: `investigate-user` and `chat` commands
 
 ## Setup
 
@@ -32,7 +33,6 @@ Before running a live login, configure these values in `.env`:
 AZURE_TENANT_ID=<tenant-guid>
 ENTRA_CLI_CLIENT_ID=<public-client-app-guid>
 ENTRA_AGENT_IDENTITY_CLIENT_ID=<agent-identity-client-guid>
-ENTRA_USER_SCOPE=api://<blueprint-app-guid>/access_as_user
 ENTRA_MCP_SCOPE=api://<mcp-resource-app-guid>/Mcp.Access
 HUNTER_DEFENDER_MCP_URL=http://127.0.0.1:8000/mcp
 ENTRA_SIDECAR_URL=http://127.0.0.1:5000
@@ -82,6 +82,26 @@ The script is idempotent. Use `-RotateBlueprintSecret` only when intentionally r
 docker compose --env-file .env -f compose.sidecar.yaml up -d
 uv run hunter-defender doctor
 ```
+
+## Running an investigation
+
+With the sidecar running and the Hunter Defender MCP reachable at `HUNTER_DEFENDER_MCP_URL`,
+run a one-shot read-only investigation:
+
+```bash
+uv run hunter-defender investigate-user user@contoso.com --days-back 7
+```
+
+Or start an interactive multi-turn session:
+
+```bash
+uv run hunter-defender chat --days-back 7
+```
+
+Each run authenticates the analyst, exchanges the user token for a delegated Agent Identity
+token through the sidecar, connects to the MCP over Streamable HTTP, and calls only the
+read-only identity tools. The agent never performs or proposes remediation; every finding is
+for human review.
 
 ## Quality checks
 

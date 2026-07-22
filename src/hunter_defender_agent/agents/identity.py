@@ -1,4 +1,5 @@
 from agno.agent import Agent
+from agno.db.in_memory import InMemoryDb
 from agno.models.base import Model
 from agno.tools.mcp import MCPTools
 
@@ -15,7 +16,7 @@ IDENTITY_AGENT_INSTRUCTIONS = [
 ]
 
 
-def create_identity_agent(model: Model, tools: MCPTools) -> Agent:
+def create_identity_agent(model: Model, tools: MCPTools, *, enable_history: bool = False) -> Agent:
     """Build the first read-only specialist with bounded tool use and no persistence."""
     return Agent(
         id="hunter-defender-identity",
@@ -28,7 +29,9 @@ def create_identity_agent(model: Model, tools: MCPTools) -> Agent:
         instructions=IDENTITY_AGENT_INSTRUCTIONS,
         markdown=True,
         telemetry=False,
-        add_history_to_context=False,
+        db=InMemoryDb() if enable_history else None,  # type: ignore[no-untyped-call]
+        add_history_to_context=enable_history,
+        num_history_runs=10 if enable_history else None,
         store_tool_messages=False,
         store_history_messages=False,
         store_media=False,
