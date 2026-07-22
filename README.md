@@ -92,10 +92,17 @@ run a one-shot read-only investigation:
 uv run hunter-defender investigate-user user@contoso.com --days-back 7
 ```
 
-Or start an interactive multi-turn session:
+Or start an interactive multi-turn session and describe the user and time window in natural
+language inside the chat:
 
 ```bash
-uv run hunter-defender chat --days-back 7
+uv run hunter-defender chat
+```
+
+```
+you > investigate alice@contoso.com over the last 14 days
+you > any risky sign-ins for bob@contoso.com in the last week?
+you > exit
 ```
 
 Each run authenticates the analyst, exchanges the user token for a delegated Agent Identity

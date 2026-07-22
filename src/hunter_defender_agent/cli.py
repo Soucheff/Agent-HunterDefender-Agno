@@ -125,9 +125,7 @@ def investigate_user(
 
 
 @app.command()
-def chat(
-    days_back: int = typer.Option(7, "--days-back", min=1, max=30, help="Lookback window in days."),
-) -> None:
+def chat() -> None:
     """Start an interactive read-only identity analysis session."""
     settings = get_settings()
     try:
@@ -137,16 +135,18 @@ def chat(
         raise typer.Exit(code=1) from error
 
     try:
-        asyncio.run(_run_chat(runner, days_back))
+        asyncio.run(_run_chat(runner))
     except (UserAuthenticationError, SidecarError) as error:
         console.print(f"[bold red]FAIL[/bold red] Authentication: {error}")
         raise typer.Exit(code=1) from error
 
 
-async def _run_chat(runner: IdentityInvestigationRunner, days_back: int) -> None:
+async def _run_chat(runner: IdentityInvestigationRunner) -> None:
     console.print(
-        f"Identity chat over the last {days_back} days. "
-        "Type your question, or 'exit' to quit."
+        "[bold]Hunter Defender identity chat[/bold] (read-only).\n"
+        "Ask in natural language and include the user and the time window, for example:\n"
+        "  investigate alice@contoso.com over the last 14 days\n"
+        "Type 'exit' or 'quit' to leave.\n"
     )
     async with runner.chat_session() as session:
         while True:
@@ -160,7 +160,8 @@ async def _run_chat(runner: IdentityInvestigationRunner, days_back: int) -> None
                 return
             if not command:
                 continue
-            reply = await session.ask(command)
+            with console.status("[dim]analyzing…[/dim]"):
+                reply = await session.ask(command)
             console.print(Markdown(reply))
 
 

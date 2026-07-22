@@ -22,7 +22,7 @@ def test_identity_agent_has_bounded_tools_and_no_telemetry_or_storage() -> None:
         MCPTools(url="http://127.0.0.1:8000/mcp", transport="streamable-http"),
     )
 
-    assert agent.tool_call_limit == 6
+    assert agent.tool_call_limit == 12
     assert agent.reasoning is False
     assert agent.telemetry is False
     assert agent.store_tool_messages is False

@@ -9,7 +9,6 @@ from hunter_defender_agent.auth.sidecar import AgentIdentitySidecarClient
 from hunter_defender_agent.auth.user_session import UserAccessToken
 from hunter_defender_agent.config import Settings
 from hunter_defender_agent.mcp.defender import (
-    IDENTITY_TOOL_ALLOWLIST,
     AuthorizationNotPreparedError,
     DelegatedMcpAuthorization,
     create_identity_mcp_tools,
@@ -59,7 +58,7 @@ async def test_authorization_must_be_refreshed_before_use() -> None:
         authorization.headers()
 
 
-def test_mcp_factory_enforces_identity_allowlist_and_dynamic_headers() -> None:
+def test_mcp_factory_exposes_all_tools_by_default() -> None:
     captured: dict[str, Any] = {}
 
     def fake_factory(**kwargs: Any) -> MCPTools:
@@ -75,7 +74,26 @@ def test_mcp_factory_enforces_identity_allowlist_and_dynamic_headers() -> None:
 
     create_identity_mcp_tools(configured_settings(), authorization, fake_factory)
 
-    assert set(captured["include_tools"]) == IDENTITY_TOOL_ALLOWLIST
+    assert captured["include_tools"] is None
     assert captured["transport"] == "streamable-http"
     assert captured["refresh_connection"] is True
     assert captured["header_provider"] == authorization.headers
+
+
+def test_mcp_factory_can_restrict_tools_via_settings() -> None:
+    captured: dict[str, Any] = {}
+
+    def fake_factory(**kwargs: Any) -> MCPTools:
+        captured.update(kwargs)
+        return cast(MCPTools, object())
+
+    settings = configured_settings()
+    restricted = settings.model_copy(
+        update={"mcp_tool_allowlist": "investigate_user, get_signin_logs"}
+    )
+    sidecar = AgentIdentitySidecarClient("http://127.0.0.1:5000")
+    authorization = DelegatedMcpAuthorization(restricted, FakeUserTokenSource(), sidecar)
+
+    create_identity_mcp_tools(restricted, authorization, fake_factory)
+
+    assert set(captured["include_tools"]) == {"investigate_user", "get_signin_logs"}

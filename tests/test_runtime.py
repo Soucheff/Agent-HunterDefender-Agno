@@ -62,7 +62,8 @@ class FakeAgent:
 def build_runner(events: list[str]) -> tuple[IdentityInvestigationRunner, FakeAgent]:
     agent = FakeAgent(events)
 
-    def factory(model: Any, tools: Any, *, enable_history: bool = False) -> Any:
+    def factory(model: Any, tools: Any, *, enable_history: bool = False,
+                tool_call_limit: int = 12) -> Any:
         events.append(f"factory(history={enable_history})")
         return agent
 

@@ -8,7 +8,7 @@ from hunter_defender_agent.auth.sidecar import AgentIdentitySidecarClient
 from hunter_defender_agent.auth.user_session import UserAccessToken
 from hunter_defender_agent.config import Settings
 
-IDENTITY_TOOL_ALLOWLIST = frozenset(
+IDENTITY_TOOL_PRESET = frozenset(
     {
         "investigate_user",
         "analyze_user_risk_profile",
@@ -19,6 +19,9 @@ IDENTITY_TOOL_ALLOWLIST = frozenset(
         "get_conditional_access_policies",
     }
 )
+
+# Backwards-compatible alias for the curated identity preset.
+IDENTITY_TOOL_ALLOWLIST = IDENTITY_TOOL_PRESET
 
 
 class UserTokenSource(Protocol):
@@ -74,14 +77,19 @@ def create_identity_mcp_tools(
     authorization: DelegatedMcpAuthorization,
     tools_factory: McpToolsFactory = MCPTools,
 ) -> MCPTools:
-    """Build read-only identity MCP tools with per-run delegated headers."""
+    """Build the MCP tools adapter with per-run delegated headers.
+
+    By default every MCP tool is exposed. Set ``MCP_TOOL_ALLOWLIST`` (comma-separated tool
+    names) to restrict the agent to a curated subset, for example the ``IDENTITY_TOOL_PRESET``.
+    """
     settings.require_entra()
+    included = settings.mcp_included_tools
     return tools_factory(
-        name="hunter_defender_identity",
+        name="hunter_defender_security",
         url=str(settings.hunter_defender_mcp_url),
         transport="streamable-http",
         timeout_seconds=int(settings.entra_timeout_seconds),
-        include_tools=sorted(IDENTITY_TOOL_ALLOWLIST),
+        include_tools=list(included) if included is not None else None,
         header_provider=authorization.headers,
         refresh_connection=True,
     )

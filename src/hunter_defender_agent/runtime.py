@@ -32,7 +32,14 @@ class Authorization(Protocol):
 
 
 class AgentFactory(Protocol):
-    def __call__(self, model: Any, tools: Any, *, enable_history: bool = ...) -> Agent: ...
+    def __call__(
+        self,
+        model: Any,
+        tools: Any,
+        *,
+        enable_history: bool = ...,
+        tool_call_limit: int = ...,
+    ) -> Agent: ...
 
 
 def validate_user_upn(value: str) -> str:
@@ -98,11 +105,13 @@ class IdentityInvestigationRunner:
         tools: AbstractAsyncContextManager[Any],
         model: Model,
         agent_factory: AgentFactory = create_identity_agent,
+        tool_call_limit: int = 12,
     ) -> None:
         self._authorization = authorization
         self._tools = tools
         self._model = model
         self._agent_factory = agent_factory
+        self._tool_call_limit = tool_call_limit
 
     @classmethod
     def from_settings(cls, settings: Settings) -> "IdentityInvestigationRunner":
@@ -115,7 +124,12 @@ class IdentityInvestigationRunner:
         authorization = DelegatedMcpAuthorization(settings, user_source, sidecar)
         tools = create_identity_mcp_tools(settings, authorization)
         model = create_ollama_model(settings)
-        return cls(authorization=authorization, tools=tools, model=model)
+        return cls(
+            authorization=authorization,
+            tools=tools,
+            model=model,
+            tool_call_limit=settings.mcp_tool_call_limit,
+        )
 
     async def investigate(self, request: InvestigationRequest) -> str:
         prompt = build_investigation_prompt(
@@ -125,7 +139,9 @@ class IdentityInvestigationRunner:
         await self._authorization.refresh()
         try:
             async with self._tools:
-                agent = self._agent_factory(self._model, self._tools)
+                agent = self._agent_factory(
+                    self._model, self._tools, tool_call_limit=self._tool_call_limit
+                )
                 result = await agent.arun(prompt)
                 return _content(result)
         finally:
@@ -136,7 +152,12 @@ class IdentityInvestigationRunner:
         await self._authorization.refresh()
         try:
             async with self._tools:
-                agent = self._agent_factory(self._model, self._tools, enable_history=True)
+                agent = self._agent_factory(
+                    self._model,
+                    self._tools,
+                    enable_history=True,
+                    tool_call_limit=self._tool_call_limit,
+                )
                 yield ChatSession(agent, self._authorization)
         finally:
             self._authorization.clear()

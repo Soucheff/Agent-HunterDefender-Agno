@@ -63,6 +63,13 @@ class Settings(BaseSettings):
         le=120,
         validation_alias="ENTRA_TIMEOUT_SECONDS",
     )
+    mcp_tool_allowlist: str | None = Field(default=None, validation_alias="MCP_TOOL_ALLOWLIST")
+    mcp_tool_call_limit: int = Field(
+        default=12,
+        ge=1,
+        le=50,
+        validation_alias="MCP_TOOL_CALL_LIMIT",
+    )
 
     @field_validator("ollama_model", "ollama_keep_alive", "entra_sidecar_service_name")
     @classmethod
@@ -79,6 +86,14 @@ class Settings(BaseSettings):
     @property
     def entra_sidecar_base_url(self) -> str:
         return str(self.entra_sidecar_url).rstrip("/")
+
+    @property
+    def mcp_included_tools(self) -> tuple[str, ...] | None:
+        """Tool names to expose to the agent, or None to expose every MCP tool."""
+        if not self.mcp_tool_allowlist:
+            return None
+        names = tuple(name.strip() for name in self.mcp_tool_allowlist.split(",") if name.strip())
+        return names or None
 
     @property
     def missing_entra_settings(self) -> tuple[str, ...]:
